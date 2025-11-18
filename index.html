@@ -37,6 +37,12 @@
             align-items: center;
             background: #000;
         }
+        
+        /* İmleci Gizle: Tam ekran/sahte tam ekran modunda */
+        #gameContainer.pseudo-fullscreen,
+        #gameContainer:fullscreen { /* Tarayıcıların desteklemesi için eklendi */
+            cursor: none;
+        }
 
         /* CSS Fallback için Sahte Tam Ekran Sınıfı (Daha Güçlü) */
         .pseudo-fullscreen {
@@ -559,6 +565,7 @@
             if(isPseudoFullscreen) {
                 gameContainer.classList.remove('pseudo-fullscreen');
                 isPseudoFullscreen = false;
+                gameContainer.style.cursor = 'default'; // İmleci geri getir
                 resizeCanvas();
             }
         }
@@ -863,15 +870,16 @@
         pauseBtn.addEventListener('click', togglePause);
         
         // GÜÇLENDİRİLMİŞ TAM EKRAN MANTIĞI
-        // 1. Önce standart yöntemi dener (Vendor Prefix'ler ile)
-        // 2. Başarısız olursa (örn. iframe kısıtlaması), "Pseudo Fullscreen" (CSS) moduna geçer
         
         const toggleFullscreen = () => {
             // Çıkış Denemeleri (Tüm Tarayıcılar)
-            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+            const isCurrentlyFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement;
+
+            if (isCurrentlyFullscreen) {
                 if (document.exitFullscreen) document.exitFullscreen();
                 else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
                 else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                // Cursor reset will be handled by the 'fullscreenchange' event listener
                 return;
             }
 
@@ -879,9 +887,12 @@
             if (isPseudoFullscreen) {
                 gameContainer.classList.remove('pseudo-fullscreen');
                 isPseudoFullscreen = false;
+                gameContainer.style.cursor = 'default'; // İmleci geri getir
                 resizeCanvas();
                 return;
             }
+
+            // ENTER FULLSCREEN (Native or Pseudo)
 
             // Native fullscreen dene (Gerçek tam ekran)
             const requestMethod = gameContainer.requestFullscreen ||
@@ -891,30 +902,45 @@
 
             if (requestMethod) {
                 requestMethod.call(gameContainer).then(() => {
-                    // Başarılı
+                    // Başarılı (Cursor is handled by the fullscreenchange event)
                 }).catch(err => {
                     console.warn("Native fullscreen blocked, switching to pseudo mode.", err);
                     // Fallback: CSS ile tam ekran
                     gameContainer.classList.add('pseudo-fullscreen');
                     isPseudoFullscreen = true;
+                    gameContainer.style.cursor = 'none'; // İmleci kaldır
                     resizeCanvas();
                 });
             } else {
                 // Tarayıcı desteklemiyorsa bile CSS Fallback
                 gameContainer.classList.add('pseudo-fullscreen');
                 isPseudoFullscreen = true;
+                gameContainer.style.cursor = 'none'; // İmleci kaldır
                 resizeCanvas();
             }
         };
         
         document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
 
+        // Native Fullscreen çıkış/giriş durumunda imleci ayarlar
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+                // Giriş: İmleci kaldır
+                gameContainer.style.cursor = 'none';
+            } else {
+                // Çıkış: İmleci geri getir
+                gameContainer.style.cursor = 'default';
+            }
+        });
+
+
         window.addEventListener('keydown', (e) => {
             // ESC ile pseudo fullscreen'den çık
-            if (e.key === 'Escape' && (isPseudoFullscreen || document.fullscreenElement)) {
+            if (e.key === 'Escape' && isPseudoFullscreen) {
                 // ESC tuşuna basıldığında pseudo fullscreen modundan çıkılır.
                 gameContainer.classList.remove('pseudo-fullscreen');
                 isPseudoFullscreen = false;
+                gameContainer.style.cursor = 'default'; // İmleci geri getir
                 resizeCanvas();
                 return;
             }
