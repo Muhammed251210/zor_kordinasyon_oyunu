@@ -149,8 +149,16 @@
             border: 3px solid #fff;
             cursor: pointer;
             transition: transform 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: rgba(0,0,0,0.6);
+            text-shadow: 0 0 2px rgba(255,255,255,0.5);
         }
-        .color-btn:hover { transform: scale(1.1); }
+        .color-btn:hover { transform: scale(1.1); color: #000; }
+        .color-taken { opacity: 0.3; cursor: not-allowed; transform: scale(0.9); }
 
         /* MOBİL KONTROLLER */
         #mobileControls {
@@ -232,14 +240,15 @@
         <div id="modeScreen" class="screen">
             <h1>Nöro Senkron</h1>
             <p style="color:#ccc; margin-bottom:30px;">Oyun Modunu Seç</p>
-            <button class="menu-btn" onclick="selectMode(1)">1 OYUNCU<br><span style="font-size:0.7em">Tek Ekran, Ortak Kontrol</span></button>
-            <button class="menu-btn" onclick="selectMode(2)">2 OYUNCU<br><span style="font-size:0.7em">Bölünmüş Ekran, Co-op</span></button>
+            <button class="menu-btn" onclick="selectMode(1)">1 OYUNCU<br><span style="font-size:0.7em">Tek Ekran (Tuş: 1)</span></button>
+            <button class="menu-btn" onclick="selectMode(2)">2 OYUNCU<br><span style="font-size:0.7em">Bölünmüş Ekran (Tuş: 2)</span></button>
         </div>
 
         <!-- 2. EKRAN: RENK SEÇİMİ -->
         <div id="colorScreen" class="screen hidden">
             <h1 id="colorTitle">Oyuncu Renk Seç</h1>
             <div class="color-grid" id="colorGrid"></div>
+            <p style="color:#888; font-size:0.9em; margin-top:20px;">(Tuşlar: 1-6)</p>
         </div>
 
         <!-- 3. EKRAN: HAZIRLIK -->
@@ -262,14 +271,14 @@
                 </div>
             </div>
             <p id="modeHint" style="color:#aaa; font-size:0.9em;">(1P Modunda her iki el de aynı gemiyi kontrol eder)</p>
-            <button class="menu-btn" id="startBtn">BAŞLA</button>
+            <button class="menu-btn" id="startBtn">BAŞLA (Enter)</button>
         </div>
 
         <!-- OYUN BİTTİ -->
         <div id="gameOverScreen" class="screen hidden">
             <h1 style="color: #ff3333;">OYUN BİTTİ</h1>
             <p style="font-size: 1.5rem;">Skor: <span id="finalScore" style="color: yellow;">0</span></p>
-            <button class="menu-btn" id="restartBtn">ANA MENÜ</button>
+            <button class="menu-btn" id="restartBtn">ANA MENÜ (Enter)</button>
         </div>
     </div>
 
@@ -287,6 +296,7 @@
         const divider = document.getElementById('divider');
         
         let gameMode = 1; 
+        let currentPlayerSelecting = 1; // Şu an hangi oyuncu renk seçiyor
         let isPlaying = false;
         let isPaused = false;
         let score = 0;
@@ -299,7 +309,6 @@
         const playerSize = 30;
         const fixedY = 500; 
         
-        // 1P Modunda sadece player1 kullanılır
         const player1 = { x: 385, y: fixedY, color: '#00ffff', trail: [], lastShot: 0 };
         const player2 = { x: 600, y: fixedY, color: '#ff00ff', trail: [], lastShot: 0 };
 
@@ -348,12 +357,13 @@
         function selectMode(mode) {
             gameMode = mode;
             modeScreen.classList.add('hidden');
-            // Her iki modda da renk seçimine git
+            currentPlayerSelecting = 1;
             setupColorSelection(1);
             playSound('click');
         }
 
         function setupColorSelection(playerNum) {
+            currentPlayerSelecting = playerNum;
             colorScreen.classList.remove('hidden');
             const title = document.getElementById('colorTitle');
             const grid = document.getElementById('colorGrid');
@@ -366,33 +376,41 @@
             }
             title.style.color = '#fff';
 
-            colors.forEach(c => {
-                if (gameMode === 2 && playerNum === 2 && player1.color === c) return; // 2P'de aynı renk olmasın
+            colors.forEach((c, index) => {
+                // Eğer 2P modu ve 2. oyuncu seçiyorsa, 1. oyuncunun rengi yasak
+                const isTaken = (gameMode === 2 && playerNum === 2 && player1.color === c);
 
                 const btn = document.createElement('div');
                 btn.className = 'color-btn';
+                if (isTaken) btn.classList.add('color-taken');
                 btn.style.backgroundColor = c;
                 btn.style.boxShadow = `0 0 15px ${c}`;
+                btn.innerText = index + 1; // Kısayol numarasını göster
+                
                 btn.onclick = () => {
-                    playSound('click');
-                    if (gameMode === 1) {
-                        // 1P Modu: Tek renk seç ve başla
-                        player1.color = c;
-                        player2.color = c; // Mobil kontrolleri uyumlu yapmak için
-                        finishSetup();
-                    } else {
-                        // 2P Modu: Sırayla seç
-                        if (playerNum === 1) {
-                            player1.color = c;
-                            setupColorSelection(2);
-                        } else {
-                            player2.color = c;
-                            finishSetup();
-                        }
-                    }
+                    if(isTaken) return; // Yasaklı renge tıklanmaz
+                    handleColorSelect(c);
                 };
                 grid.appendChild(btn);
             });
+        }
+
+        function handleColorSelect(c) {
+            playSound('click');
+            if (gameMode === 1) {
+                player1.color = c;
+                player2.color = c;
+                finishSetup();
+            } else {
+                if (currentPlayerSelecting === 1) {
+                    player1.color = c;
+                    setupColorSelection(2);
+                } else {
+                    if (player1.color === c) return; // Güvenlik kontrolü
+                    player2.color = c;
+                    finishSetup();
+                }
+            }
         }
 
         function finishSetup() {
@@ -402,10 +420,10 @@
             const modeHint = document.getElementById('modeHint');
             if (gameMode === 1) {
                 modeHint.innerText = "(1 OYUNCU MODU: Sol ve Sağ kontrollerin hepsi TEK gemiyi yönetir)";
-                divider.style.opacity = '0'; // Çizgiyi gizle
+                divider.style.opacity = '0';
             } else {
                 modeHint.innerText = "(2 OYUNCU MODU: Ekranı ve görevleri paylaşın)";
-                divider.style.opacity = '1'; // Çizgiyi göster
+                divider.style.opacity = '1';
             }
             
             startScreen.classList.remove('hidden');
@@ -415,8 +433,6 @@
             const leftBtns = document.querySelectorAll('.left-group .btn');
             const rightBtns = document.querySelectorAll('.right-group .btn');
             
-            // 1P Modunda tüm butonlar seçilen tek renge bürünür
-            // 2P Modunda ayrı ayrı
             const colorL = player1.color;
             const colorR = (gameMode === 1) ? player1.color : player2.color;
 
@@ -473,11 +489,9 @@
             bullets = [];
             
             if (gameMode === 1) {
-                // 1P: Ortada başlat
                 player1.x = (canvas.width / 2) - (playerSize / 2);
                 player1.trail = []; player1.lastShot = 0;
             } else {
-                // 2P: Ayrı konumlarda başlat
                 player1.x = 200; player1.trail = []; player1.lastShot = 0;
                 player2.x = 600; player2.trail = []; player2.lastShot = 0;
             }
@@ -491,7 +505,7 @@
 
         function fireBullet(playerObj, xPos) {
             const now = Date.now();
-            if (now - playerObj.lastShot > 250) { // Biraz daha hızlı ateş
+            if (now - playerObj.lastShot > 250) {
                 playerObj.lastShot = now;
                 bullets.push({
                     x: xPos + playerSize / 2,
@@ -499,7 +513,6 @@
                     r: 4,
                     color: playerObj.color,
                     speed: 10,
-                    // 1P modunda side önemsiz, 2P'de önemli
                     side: (gameMode === 2 && playerObj === player1) ? 'left' : ((gameMode === 2) ? 'right' : 'all')
                 });
                 playSound('shoot');
@@ -522,32 +535,21 @@
             const moveSpeed = 8;
 
             if (gameMode === 1) {
-                // --- 1 OYUNCU MODU ---
-                // Sol el (Z/C) VEYA Sağ el (Oklar) aynı gemiyi hareket ettirir
-                if ((keys.z || keys.ArrowLeft) && player1.x > 0) {
-                    player1.x -= moveSpeed;
-                }
-                if ((keys.c || keys.ArrowRight) && player1.x < canvas.width - playerSize) {
-                    player1.x += moveSpeed;
-                }
-                // Ateşleme: Sol el (X) VEYA Sağ el (Aşağı Ok)
-                if (keys.x || keys.ArrowDown) {
-                    fireBullet(player1, player1.x);
-                }
+                // 1P Modu
+                if ((keys.z || keys.ArrowLeft) && player1.x > 0) player1.x -= moveSpeed;
+                if ((keys.c || keys.ArrowRight) && player1.x < canvas.width - playerSize) player1.x += moveSpeed;
+                if (keys.x || keys.ArrowDown) fireBullet(player1, player1.x);
 
                 if (frames % 3 === 0) {
                     player1.trail.push({x: player1.x, y: player1.y});
                     if (player1.trail.length > 8) player1.trail.shift();
                 }
-
             } else {
-                // --- 2 OYUNCU MODU ---
-                // Sol Oyuncu
+                // 2P Modu
                 if (keys.z && player1.x > 0) player1.x -= moveSpeed;
                 if (keys.c && player1.x < (canvas.width/2) - playerSize - 5) player1.x += moveSpeed;
                 if (keys.x) fireBullet(player1, player1.x);
 
-                // Sağ Oyuncu
                 if (keys.ArrowLeft && player2.x > (canvas.width/2) + 5) player2.x -= moveSpeed;
                 if (keys.ArrowRight && player2.x < canvas.width - playerSize) player2.x += moveSpeed;
                 if (keys.ArrowDown) fireBullet(player2, player2.x);
@@ -560,14 +562,14 @@
                 }
             }
 
-            // Mermi Hareketi
+            // Mermiler
             for (let i = bullets.length - 1; i >= 0; i--) {
                 let b = bullets[i];
                 b.y -= b.speed;
                 if (b.y < 0) bullets.splice(i, 1);
             }
 
-            // Engel Oluşturma
+            // Engeller
             let spawnRate = Math.max(20, 60 - Math.floor(score/100));
             if (frames % spawnRate === 0) {
                 const type = Math.random();
@@ -575,50 +577,37 @@
                 const isArmored = Math.random() < 0.25; 
                 
                 if (gameMode === 1) {
-                    // 1P Modu: Ekranın tamamına rastgele spawn
                     obstacles.push({
                         x: Math.random() * (canvas.width - obsSize),
                         y: -50, w: obsSize, h: obsSize,
                         speed: speed + Math.random() * 1.5,
-                        armored: isArmored,
-                        targetColor: player1.color,
-                        side: 'all'
+                        armored: isArmored, targetColor: player1.color, side: 'all'
                     });
                 } else {
-                    // 2P Modu: Sol ve Sağ ayrı
                     if (type < 0.6) { // Sol
                         obstacles.push({
-                            side: 'left',
-                            x: Math.random() * ((canvas.width/2) - obsSize),
-                            y: -50, w: obsSize, h: obsSize,
-                            speed: speed + Math.random() * 1.5,
-                            armored: isArmored, targetColor: player1.color
+                            side: 'left', x: Math.random() * ((canvas.width/2) - obsSize), y: -50, w: obsSize, h: obsSize,
+                            speed: speed + Math.random() * 1.5, armored: isArmored, targetColor: player1.color
                         });
                     }
                     if (type > 0.4) { // Sağ
                         obstacles.push({
-                            side: 'right',
-                            x: (canvas.width/2) + Math.random() * ((canvas.width/2) - obsSize),
-                            y: -50, w: obsSize, h: obsSize,
-                            speed: speed + Math.random() * 1.5,
-                            armored: isArmored, targetColor: player2.color
+                            side: 'right', x: (canvas.width/2) + Math.random() * ((canvas.width/2) - obsSize), y: -50, w: obsSize, h: obsSize,
+                            speed: speed + Math.random() * 1.5, armored: isArmored, targetColor: player2.color
                         });
                     }
                 }
             }
 
-            // Engel Mantığı (Çarpışma & Vurulma)
+            // Çarpışma
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 let obs = obstacles[i];
                 obs.y += obs.speed;
                 let obsHit = false;
 
-                // Mermi Kontrolü
                 for (let j = bullets.length - 1; j >= 0; j--) {
                     let b = bullets[j];
-                    // 1P: Her mermi her şeyi vurur. 2P: Sadece kendi tarafını.
                     let canHit = (gameMode === 1) || (b.side === obs.side);
-                    
                     if (canHit) {
                         if (b.x > obs.x && b.x < obs.x + obs.w && b.y > obs.y && b.y < obs.y + obs.h) {
                             bullets.splice(j, 1);
@@ -638,16 +627,9 @@
                 }
                 if (obsHit) continue;
 
-                // Gemi Çarpışması
                 let playersToCheck = (gameMode === 1) ? [player1] : (obs.side === 'left' ? [player1] : [player2]);
-                
                 for (let p of playersToCheck) {
-                    if (
-                        p.x < obs.x + obs.w &&
-                        p.x + playerSize > obs.x &&
-                        p.y < obs.y + obs.h &&
-                        p.y + playerSize > obs.y
-                    ) {
+                    if (p.x < obs.x + obs.w && p.x + playerSize > obs.x && p.y < obs.y + obs.h && p.y + playerSize > obs.y) {
                         createParticles(p.x + playerSize/2, p.y + playerSize/2, p.color);
                         gameOver();
                         return;
@@ -677,19 +659,15 @@
             ctx.shadowBlur = 15;
 
             if (gameMode === 1) {
-                // Tek Oyuncu Çizimi
                 ctx.fillStyle = player1.color; ctx.shadowColor = player1.color;
                 ctx.fillRect(player1.x, player1.y, playerSize, playerSize);
-                // Kuyruk
                 ctx.shadowBlur = 0; ctx.lineWidth = 2; ctx.strokeStyle = player1.color;
                 ctx.beginPath();
                 player1.trail.forEach((t, i) => { if(i===0) ctx.moveTo(t.x+15, t.y+15); else ctx.lineTo(t.x+15, t.y+15); });
                 ctx.stroke();
             } else {
-                // 2 Oyuncu Çizimi
                 ctx.fillStyle = player1.color; ctx.shadowColor = player1.color;
                 ctx.fillRect(player1.x, player1.y, playerSize, playerSize);
-                
                 ctx.fillStyle = player2.color; ctx.shadowColor = player2.color;
                 ctx.beginPath(); ctx.arc(player2.x+15, player2.y+15, 15, 0, Math.PI*2); ctx.fill();
 
@@ -698,21 +676,18 @@
                 ctx.beginPath();
                 player1.trail.forEach((t, i) => { if(i===0) ctx.moveTo(t.x+15, t.y+15); else ctx.lineTo(t.x+15, t.y+15); });
                 ctx.stroke();
-
                 ctx.strokeStyle = player2.color;
                 ctx.beginPath();
                 player2.trail.forEach((t, i) => { if(i===0) ctx.moveTo(t.x+15, t.y+15); else ctx.lineTo(t.x+15, t.y+15); });
                 ctx.stroke();
             }
 
-            // Mermiler
             ctx.shadowBlur = 10;
             bullets.forEach(b => {
                 ctx.fillStyle = b.color; ctx.shadowColor = b.color;
                 ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
             });
 
-            // Engeller
             obstacles.forEach(obs => {
                 if (obs.armored) {
                     ctx.shadowBlur = 0;
@@ -722,12 +697,9 @@
                     ctx.beginPath(); ctx.moveTo(obs.x, obs.y); ctx.lineTo(obs.x+obs.w, obs.y+obs.h); ctx.moveTo(obs.x+obs.w, obs.y); ctx.lineTo(obs.x, obs.y+obs.h); ctx.stroke();
                 } else {
                     ctx.shadowBlur = 10;
-                    // 1P modunda engel rengi oyuncuyla aynı veya kontrast olabilir, biz oyuncu renginin koyusunu kullanalım
                     let baseColor = (gameMode === 1) ? player1.color : (obs.side === 'left' ? player1.color : player2.color);
                     ctx.fillStyle = shadeColor(baseColor, -50); 
-                    ctx.shadowColor = baseColor;
-                    ctx.strokeStyle = baseColor;
-                    ctx.lineWidth = 3;
+                    ctx.shadowColor = baseColor; ctx.strokeStyle = baseColor; ctx.lineWidth = 3;
                     ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
                     ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
                 }
@@ -797,10 +769,33 @@
         });
 
         window.addEventListener('keydown', (e) => {
+            // MENÜ KISAYOLLARI
+            if (!modeScreen.classList.contains('hidden')) {
+                if (e.key === '1') selectMode(1);
+                if (e.key === '2') selectMode(2);
+                return;
+            }
+
+            // RENK SEÇİM KISAYOLLARI (1-6)
+            if (!colorScreen.classList.contains('hidden')) {
+                const keyIndex = parseInt(e.key) - 1;
+                if (keyIndex >= 0 && keyIndex < colors.length) {
+                    const c = colors[keyIndex];
+                    // 2P Modunda renk çakışmasını engelle
+                    if (gameMode === 2 && currentPlayerSelecting === 2 && player1.color === c) return;
+                    handleColorSelect(c);
+                }
+                return;
+            }
+
+            // HAZIRLIK VEYA OYUN SONU (Enter)
             if (e.key === 'Enter') { 
-                if(!isPlaying && gameOverScreen.classList.contains('hidden') === false) resetToMenu();
+                if(!startScreen.classList.contains('hidden')) startGame();
+                else if(!isPlaying && !gameOverScreen.classList.contains('hidden')) resetToMenu();
                 return; 
             }
+
+            // OYUN İÇİ
             if ((e.key.toLowerCase() === 's' || e.key === 'ArrowUp') && (isPlaying || isPaused)) { togglePause(); return; }
 
             const k = e.key.toLowerCase();
