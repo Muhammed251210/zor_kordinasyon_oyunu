@@ -89,6 +89,32 @@
             background: rgba(255, 255, 255, 0.3);
         }
 
+        /* --- DURDURMA BUTONU (SOL ÜST) --- */
+        #pauseBtn {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            transition: background 0.2s;
+            backdrop-filter: blur(4px);
+        }
+
+        #pauseBtn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         /* --- MOBİL KONTROLLER --- */
         #mobileControls {
             position: absolute;
@@ -216,6 +242,8 @@
         
         <!-- Tam Ekran Butonu -->
         <button id="fullscreenBtn" title="Tam Ekran">⛶</button>
+        <!-- Durdur Butonu -->
+        <button id="pauseBtn" title="Durdur/Devam Et">❚❚</button>
         
         <div id="uiLayer">
             <div id="scoreDisplay">0</div>
@@ -271,9 +299,11 @@
         const scoreDisplay = document.getElementById('scoreDisplay');
         const finalScoreEl = document.getElementById('finalScore');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
         
         // Oyun Durumu
         let isPlaying = false;
+        let isPaused = false;
         let score = 0;
         let speed = 5;
         let animationId;
@@ -338,6 +368,46 @@
             }
         });
 
+        // Durdurma (Pause) Fonksiyonu
+        pauseBtn.addEventListener('click', togglePause);
+
+        function togglePause() {
+            if (!isPlaying && !isPaused) return; // Oyun hiç başlamadıysa çalışma
+
+            isPaused = !isPaused;
+
+            if (isPaused) {
+                // Oyunu Durdur
+                cancelAnimationFrame(animationId);
+                pauseBtn.innerText = '▶'; // Oynat ikonu
+                
+                // Ekrana Duraklatıldı Yazısı Bas
+                ctx.save();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '900 60px Segoe UI';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = '#00d2ff';
+                ctx.shadowBlur = 20;
+                ctx.fillText('DURAKLATILDI', canvas.width/2, canvas.height/2);
+                
+                // Alt bilgi
+                ctx.font = '20px Segoe UI';
+                ctx.fillStyle = '#ccc';
+                ctx.shadowBlur = 0;
+                ctx.fillText("Devam etmek için 'S' veya 'Yukarı Ok' bas", canvas.width/2, canvas.height/2 + 50);
+                
+                ctx.restore();
+            } else {
+                // Oyuna Devam Et
+                pauseBtn.innerText = '❚❚'; // Durdur ikonu
+                animate();
+            }
+        }
+
         // Klavye
         window.addEventListener('keydown', (e) => {
             // ENTER ile Restart kontrolü
@@ -346,11 +416,17 @@
                 return;
             }
 
+            // 's' veya 'ArrowUp' ile Durdurma (Pause)
+            if (e.key.toLowerCase() === 's' || e.key === 'ArrowUp') {
+                togglePause();
+                return;
+            }
+
             const k = e.key.toLowerCase() === 'z' ? 'z' : (e.key.toLowerCase() === 'c' ? 'c' : e.key);
             
             if(keys.hasOwnProperty(k)) {
                 // Sadece tuşa ilk basışta ses çal (basılı tutunca tekrarlamasın)
-                if (!keys[k] && isPlaying) {
+                if (!keys[k] && isPlaying && !isPaused) {
                     playClickSound();
                 }
                 keys[k] = true;
@@ -399,6 +475,8 @@
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             isPlaying = true;
+            isPaused = false;
+            pauseBtn.innerText = '❚❚';
             score = 0;
             speed = 5;
             frames = 0;
